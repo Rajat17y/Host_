@@ -1,0 +1,17 @@
+streamlit
+pyrebase
+time
+firebase_admin
+firebase_admin
+uuid
+pandas as pd
+plotly.express
+datetime
+os
+json
+requests
+runpy
+importlib
+pandas
+time
+threading
