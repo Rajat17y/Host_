@@ -1,9 +1,97 @@
 import pandas as pd
 import numpy as np
+import streamlit as st
+import pyrebase
+import time
+import firebase_admin
+from firebase_admin import credentials, firestore
+import uuid
+import pandas as pd
+import plotly.express as px
+from datetime import datetime, timedelta
+import os
+import json
+import requests
+import runpy
+import importlib
+import streamlit as st
+import pandas as pd
+import time
+import threading
+
+
+def initialize_firebase():
+        try:
+            # Check if already initialized
+            if not firebase_admin._apps:
+                # For local development
+                if os.path.exists("serviceAccountKey.json"):
+                    cred = credentials.Certificate("serviceAccountKey.json")
+                    firebase_admin.initialize_app(cred)
+                    st.sidebar.success("Firebase connection successful (local)")
+                # For Streamlit Cloud
+                else:
+                    try:
+                        key_dict = json.loads(st.secrets["FIREBASE_SERVICE_ACCOUNT_KEY"])
+                        cred = credentials.Certificate(key_dict)
+                        firebase_admin.initialize_app(cred)
+                        st.sidebar.success("Firebase connection successful (cloud)")
+                    except Exception as e:
+                        st.sidebar.error(f"Error accessing Firebase secrets: {e}")
+                        st.stop()
+            
+            return firestore.client()
+        except Exception as e:
+            st.error(f"Firestore initialization failed: {str(e)}")
+            st.code(traceback.format_exc())
+            return None
+db = initialize_firebase()
+def get_collection_names():
+    """Fetch and return all collection names from Firestore."""
+    collections = db.collections()  # This returns a generator
+    collection_names = [col.id for col in collections]  # Extract collection names
+    return collection_names
+
+# Fetch and print collection names
+collections = get_collection_names()
+print("Firestore Collections:", collections)
+
+def fetch_data_as_2d_array(selected_columns):
+    """Fetch Firestore collection and return data as a 2D array with only specified field names."""
+    data_array = []
+    
+    # Get all documents in the collection
+    docs = db.collection(collections[2]).stream()
+    
+    field_names = []  # Store column names
+    
+    for doc in docs:
+        doc_data = doc.to_dict()
+
+        # Extract field names (only for the first document)
+        if not field_names:
+            field_names = list(doc_data.keys())
+
+        # Extract values for only selected columns
+        row_values = [doc_data.get(col, None) for col in selected_columns]  
+        
+        # Append row to 2D array
+        data_array.append(row_values)
+    
+    return selected_columns, data_array  # Return selected column names and filtered data
+
+# Example usage
+selected_cols = ['email','bmi','diet_preference','fitness_goal']  # Define columns you need
+fields, data = fetch_data_as_2d_array(selected_cols)
+
+#print("Selected Fields:", fields)
+#print("Filtered Data:", data)
+
+
 
 file_path = "nutrients.csv"
 dataset = pd.read_csv(file_path)
-users = pd.read_csv(r'data\all_survey_responses.csv')
+users = pd.read_csv('data/all_survey_responses.csv')
 
 # Replace alphabets in specific columns (by index)
 columns_to_replace = [3, 4, 5, 6, 7, 8]
@@ -65,19 +153,20 @@ from sklearn.preprocessing import StandardScaler
 sc = StandardScaler()
 X[:, :-1] = sc.fit_transform(X[:, :-1])
 
-def recommend(email,coef=coef):
+def recommend(email):
     #Processing According to user
-    numberRows = coef.shape[0]
+    numberRows = len(data)
     matched = []
-    coef = np.array(coef)
+    idx = -1
     for i in range(0,numberRows):
-        if(coef[i,0]==email):
-            matched.append(coef[i,1:])
+        idx = i
+        if(data[i][0]==email):
+            break
 
     #print(matched[0])
-    a = matched[0][0]
-    b = str(matched[0][1])
-    c = str(matched[0][2])
+    a = data[idx][1]
+    b = str(data[idx][2])
+    c = str(data[idx][3])
     _c = 1
     if c=='Muscle gain':
         _c = 80
@@ -115,3 +204,5 @@ def recommend(email,coef=coef):
                 final_list.pop(i)
     #print(len(final_list))
     return final_list
+
+#print(recommend('kakshixguy099@gmail.com'))
